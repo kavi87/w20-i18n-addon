@@ -1,0 +1,9 @@
+<div>
+    <div data-ng-hide="isDeleting" >
+        <button type="button" class="btn btn-danger btn-xs" data-ng-click="startDelete()"><i class="fa fa-trash-o"></i></button>
+    </div>
+    <div data-ng-show="isDeleting">
+        <button type="button" class="btn btn-default btn-xs" data-ng-click="cancel()">{{ 'application.view.seed-i18n.abort' | localize }}</button>
+        <button type="button" class="btn btn-danger btn-xs" data-ng-click="w20Confirm()"><i class="fa fa-trash-o"></i> {{ 'application.view.seed-i18n.confirm' | localize }}</button>
+    </div>
+</div>

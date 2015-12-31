@@ -36,7 +36,7 @@
     },
     "i18n": {
       "templateUrl": "{w20-i18n-addon}/views/dashboard.html",
-      "controller": "SeedI18nDashboardController",
+      "controller": "SeedI18nMainController",
       "security": "hasPermission('seed-w20', ['seed','i18n','locale','read'])"
     },
     "statistic": {

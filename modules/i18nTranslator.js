@@ -8,38 +8,23 @@
 define([
     'module',
     'require',
+    'jquery',
     '{angular}/angular',
     '{lodash}/lodash',
     '{dropzone}/dropzone-amd-module',
+    '[text]!{w20-i18n-addon}/templates/confirm.html',
+
     '{w20-core}/modules/notifications',
     '{angular-sanitize}/angular-sanitize',
     '{angular-resource}/angular-resource',
     '{w20-core}/modules/security',
     '{w20-dataviz}/modules/charts/multibar'
-], function (_module, require, angular, _, Dropzone) {
+], function (_module, require, $, angular, _, Dropzone, confirmTemplate) {
     'use strict';
 
     var _config = _module && _module.config() || {};
 
     var module = angular.module('i18nTranslator', ['ngResource', 'ngSanitize', 'ui.bootstrap', 'ui.bootstrap.tooltip', 'w20CoreSecurity']);
-
-    /**
-     *  Target : Service to share the target language to be translated
-     *  from the default language.
-     */
-    module.factory('Target', function () {
-        var target;
-        return {
-            setTarget: function (lang) {
-                target = lang;
-                window.localStorage.setItem('target', JSON.stringify(lang));
-            },
-            getTarget: function () {
-                target = JSON.parse(window.localStorage.getItem('target'));
-                return target;
-            }
-        };
-    });
 
     /**
      *  SeedI18nService : Service that manages REST resources.
@@ -92,9 +77,6 @@ define([
     }]);
 
 
-    /**
-     * Statistic controller
-     */
     module.controller('SeedI18nStatisticController',
         ['$scope', 'SeedI18nService', '$location', 'Target', 'NotificationService', 'AuthorizationService', 'AuthenticationService',
             function ($scope, SeedI18nService, $location, Target, notificator, authorizationService, authenticationService) {
@@ -115,11 +97,9 @@ define([
                     }
                 };
 
-                // Fetching the application locales
                 SeedI18nService.applicationLocales.query(function (applicationLocales) {
                     $scope.applicationLocales = applicationLocales;
 
-                    // ...followed by all the available locales (change to a ".then()" promise instead of callback with angular 1.2)
                     SeedI18nService.allLocales.query(function (allLocales) {
                         // Filtering the list of all locales  by removing the one that are already
                         // in the application locales list so that they don't repeat.
@@ -268,432 +248,431 @@ define([
             }]);// end controller
 
 
-    /**
-     * Dashboard controller
-     */
-    module.controller('SeedI18nDashboardController',
-        ['$scope', 'SeedI18nService', '$location', 'Target', 'NotificationService', 'AuthorizationService', 'AuthenticationService',
-            function ($scope, SeedI18nService, $location, Target, notificator, authorizationService, authenticationService) {
+    module.controller('SeedI18nMainController', ['$scope', 'AuthorizationService', 'AuthenticationService', function ($scope, authorizationService, authenticationService) {
+        $scope.app = {
+            authorization: authorizationService,
+            authentication: authenticationService,
+            restPrefix: _config.seedi18nRestPrefix,
+            defaultLocale: undefined,
+            applicationLocales: [],
+            sourceLocale: undefined
+        };
+    }]);
 
-                $scope.authorization = authorizationService;
-                $scope.authentication = authenticationService;
-
-                $scope.applicationLocales = [];
-                $scope.allLocales = [];
-                $scope.show = false;
-                $scope.hide = false;
-
-                $scope.goTo = function (location) {
-                    if ($scope.allowTranslate()) {
-                        $location.path(location);
+    module.controller('SeedI18nDashboardController', ['$scope', 'SeedI18nService', '$q', function ($scope, rest, $q) {
+        function difference(one, two) {
+            var result = [];
+            var arrayObjectIndexOf = function (myArray, searchTerm, property) {
+                for (var i = 0, len = myArray.length; i < len; i++) {
+                    if (myArray[i][property] === searchTerm) {
+                        return i;
                     }
-                };
-
-                // Fetching the application locales
-                SeedI18nService.applicationLocales.query(function (applicationLocales) {
-                    $scope.applicationLocales = applicationLocales;
-                    // ...followed by all the available locales (change to a ".then()" promise instead of callback with angular 1.2)
-                    SeedI18nService.allLocales.query(function (allLocales) {
-                        // Filtering the list of all locales  by removing the one that are already
-                        // in the application locales list so that they don't repeat.
-                        $scope.allLocales = difference(allLocales, $scope.applicationLocales);
-                    });
-                    // Setting the default locale. The view won't show if data couldn't be fetched successfully.
-                    SeedI18nService.defaultLocale.get(function (defaultLocale) {
-                            for (var i = 0; i < $scope.applicationLocales.length; i++) {
-                                if (defaultLocale.englishLanguage === $scope.applicationLocales[i].englishLanguage) {
-                                    $scope.defaultLocale = $scope.applicationLocales[i];
-                                    break;
-                                }
-                            }
-                            $scope.show = true;
-                        },
-                        function () {
-                            $scope.hide = true;
-                        });
-                });
-
-
-                // If the list of application locales changes, we set another language as the
-                // default target language because the target language could have been removed.
-                $scope.$watch('applicationLocales', function () {
-                    $scope.target = $scope.applicationLocales[0];
-                });
-
-                // Add locales to the set of application locale
-                $scope.add = function () {
-                    if ($scope.allLangSelected) {
-                        $scope.applicationLocales = $scope.applicationLocales.concat($scope.allLangSelected);
-                    }
-                    // remove the locale from the list of all locales
-                    $scope.allLocales = difference($scope.allLocales, $scope.applicationLocales);
-                    //$scope.languageToTranslate = $scope.applicationLocales[0]; !! REVERT
-                    $scope.updateApplicationLocales();
-                    $scope.allLangSelected = '';
-                };
-
-                // remove locales
-
-                $scope.remove = function () {
-                    if ($scope.availLangSelected) {
-                        $scope.applicationLocales = difference($scope.applicationLocales, $scope.availLangSelected);
-                        $scope.allLocales = $scope.allLocales.concat($scope.availLangSelected);
-
-                        // if the default locale was in the set of application locale it becomes undefined
-                        if (typeof $scope.defaultLocale !== 'undefined') {
-                            if (arrayObjectIndexOf($scope.applicationLocales, $scope.defaultLocale.englishLanguage, 'englishLanguage') < 0) {
-                                $scope.defaultLocale = undefined;
-                            }
-                        }
-
-                        Target.setTarget('');
-
-                        angular.forEach($scope.availLangSelected, function (localToDelete) {
-                            SeedI18nService.applicationLocales.delete({code: localToDelete.code}, function () {
-                                    notificator.notify('Local deleted : ' + localToDelete.code);
-                                },
-                                function () {
-                                    notificator.notify('Failed delete local');
-                                });
-                        });
-                    }
-                    $scope.availLangSelected = '';
-                };
-
-                // allow translate only if there is at least 2 locales and a default locale
-                $scope.allowTranslate = function () {
-                    return !!($scope.applicationLocales.length > 1 && typeof $scope.defaultLocale !== 'undefined');
-                };
-
-                // Update the default local
-                $scope.updateDefault = function () {
-                    SeedI18nService.defaultLocale.update($scope.defaultLocale);
-                };
-
-                // Update the visible application locales (when removing, adding etc.)
-                $scope.updateApplicationLocales = function () {
-                    //  if ($scope.applicationLocales.length)
-                    SeedI18nService.applicationLocales.update($scope.applicationLocales, function (data) {
-                    });
-                };
-
-                // return index of object in "myArray" with "searchterm" as the value of "property"
-                function arrayObjectIndexOf(myArray, searchTerm, property) {
-                    for (var i = 0, len = myArray.length; i < len; i++) {
-                        if (myArray[i][property] === searchTerm) {
-                            return i;
-                        }
-                    }
-                    return -1;
                 }
-
-                // substract array two from one
-                function difference(one, two) {
-                    var result = [];
-                    for (var i = 0, len1 = one.length; i < len1; i++) {
-                        if (arrayObjectIndexOf(two, one[i].englishLanguage, 'englishLanguage') === -1) {
-                            result.push(one[i]);
-                        }
-                    }
-                    return result;
+                return -1;
+            };
+            for (var i = 0, len1 = one.length; i < len1; i++) {
+                if (arrayObjectIndexOf(two, one[i].englishLanguage, 'englishLanguage') === -1) {
+                    result.push(one[i]);
                 }
+            }
+            return result;
+        }
 
-            }]);// end controller
+        function errorHandler(error) {
+            throw new Error(error.message);
+        }
+
+        $scope.locales = {};
+
+        $scope.locales.add = function (locale) {
+            if (locale) {
+                $scope.app.applicationLocales.push(locale);
+                this.allLocales = difference(this.allLocales, $scope.app.applicationLocales);
+                rest.applicationLocales.update($scope.app.applicationLocales, angular.noop, errorHandler);
+            }
+        };
+
+        $scope.locales.remove = function (locale) {
+            if (locale) {
+                $scope.app.applicationLocales = difference($scope.app.applicationLocales, [locale]);
+                this.allLocales = this.allLocales.concat([locale]);
+                if ($scope.app.defaultLocale && $scope.app.defaultLocale.englishLanguage === locale.englishLanguage) {
+                    $scope.app.defaultLocale = undefined;
+                }
+                rest.applicationLocales.delete({code: locale.code}, angular.noop, errorHandler);
+            }
+        };
+
+        $scope.locales.updateDefault = function () {
+            rest.defaultLocale.update($scope.app.defaultLocale, angular.noop, errorHandler);
+            $scope.app.sourceLocale = $scope.app.defaultLocale;
+        };
+
+        var promises = {
+            applicationLocales: rest.applicationLocales.query().$promise.then(function (data) {
+                return data;
+            }, errorHandler),
+            allLocales: rest.allLocales.query().$promise.then(function (data) {
+                return data;
+            }, errorHandler),
+            defaultLocale: rest.defaultLocale.get().$promise.then(function (data) {
+                return data;
+            }, errorHandler)
+        };
+
+        $q.all(promises).then(function (result) {
+            if (result.applicationLocales && result.applicationLocales.length) {
+                $scope.app.applicationLocales = result.applicationLocales;
+            }
+            if (result.allLocales && result.allLocales.length) {
+                $scope.locales.allLocales = difference(result.allLocales, $scope.app.applicationLocales);
+            }
+            if (result.defaultLocale) {
+                for (var i = 0; i < $scope.app.applicationLocales.length; i++) {
+                    if (result.defaultLocale.englishLanguage === $scope.app.applicationLocales[i].englishLanguage) {
+                        $scope.app.sourceLocale = $scope.app.defaultLocale = $scope.app.applicationLocales[i];
+                        break;
+                    }
+                }
+            }
+        }, errorHandler);
+    }]);
+
+    module.controller('SeedI18nKeysController', ['$scope', 'SeedI18nService', function ($scope, rest) {
+        function getKeys(options, callback) {
+            rest.keys.query(options, function (keys) {
+                callback(keys);
+            }, errorHandler);
+        }
+
+        function errorHandler(error) {
+            throw new Error(error.message);
+        }
+
+        $scope.keys = {};
+
+        $scope.keys.emptyList = false;
+
+        $scope.keys.setSourceLocale = function (locale) {
+            $scope.app.sourceLocale = locale;
+        };
+
+        $scope.keys.delete = function (key) {
+            _.pull($scope.keys.list, key);
+            rest.keys.delete({ name: key.name }, angular.noop, errorHandler);
+        };
+
+        $scope.keys.criterias = {
+            isMissing: false,
+            isOutdated: false,
+            isApprox: false,
+            searchName: ''
+        };
+
+        getKeys($scope.keys.criterias, function (keys) {
+            if (keys && keys.length > 0) {
+                $scope.keys.list = keys;
+                $scope.keys.emptyList = false;
+            } else {
+                $scope.keys.emptyList = true;
+            }
+        });
+
+        $scope.withoutDefault = function (locale) {
+            return locale.code !== $scope.app.defaultLocale.code;
+        }
+    }]);
+
+    module.directive('w20DropdownBlur', ['$timeout', function ($timeout) {
+        return {
+            link: function (scope, element) {
+                element.find('a').on('click', function(event) {
+                    angular.element( event.target ).blur();
+                    return false;
+                });
+            }
+        };
+    }]);
+
+    module.directive('w20Confirm', [function () {
+        return {
+            template: confirmTemplate,
+            scope: {
+              w20Confirm: '&'
+            },
+            link: function (scope) {
+                scope.isDeleting = false;
+                scope.startDelete = function () {
+                    scope.isDeleting = true;
+                };
+                scope.cancel = function () {
+                    scope.isDeleting = false;
+                };
+            }
+        };
+    }]);
+
 
     /**
      * Manage key controller
      */
-    module.controller('SeedI18nKeysController',
-        ['$scope', 'SeedI18nService', '$timeout', 'Target', '$location', 'NotificationService', 'AuthorizationService', 'AuthenticationService',
-            function ($scope, SeedI18nService, $timeout, Target, $location, notificator, authorizationService, authenticationService) {
+    module.controller('SeedI18nKeysControllerDeprecated', ['$scope', 'SeedI18nService', function ($scope, SeedI18nService) {
 
-                $scope.authorization = authorizationService;
-                $scope.authentication = authenticationService;
+        $scope.importKey = false;
+        $scope.addKey = false; // boolean to show/hide "add key" button
+        $scope.keys = []; // to hold all the keys
+        $scope.keysMissing = []; // to hold all the keys with "missing" property (i.e keys empty)
+        $scope.keysOutdated = []; // to hold all the keys with "outdated" property (a key is outdated if the default translation has changed but not the other translations accordingly, could have been called "keysStale" as well)
+        $scope.currentKey = []; // to hold the selected key
+        $scope.disableKeyInput = false; // disable key textarea if no default locale
+        $scope.pageIndex = 1;
+        $scope.pageSize = 10;
+        $scope.maxSize = 5;
 
-                $scope.restPrefix = _config.seedi18nRestPrefix;
-                $scope.importKey = false;
-                $scope.addKey = false; // boolean to show/hide "add key" button
-                $scope.keys = []; // to hold all the keys
-                $scope.keysMissing = []; // to hold all the keys with "missing" property (i.e keys empty)
-                $scope.keysOutdated = []; // to hold all the keys with "outdated" property (a key is outdated if the default translation has changed but not the other translations accordingly, could have been called "keysStale" as well)
-                $scope.currentKey = []; // to hold the selected key
-                $scope.disableKeyInput = false; // disable key textarea if no default locale
+        $scope.updateKeysList = function (pageIndex, pageSize, missing, outdated, searchName, approx) {
+            SeedI18nService.keys.query({
+                    pageIndex: pageIndex,
+                    pageSize: pageSize,
+                    isMissing: missing,
+                    isOutdated: outdated,
+                    searchName: searchName,
+                    isApprox: approx
+                },
+                function (data) {
+                    if (data.length) {
+                        $scope.keys = data;
 
-                //Pagination
-                $scope.pageIndex = 1;
-                $scope.pageSize = 10;
-                $scope.maxSize = 5;
-
-                $scope.goTo = function (location) {
-                    if ($scope.allowTranslate()) {
-                        $location.path(location);
-                    }
-                };
-
-                /**
-                 * Update the list of keys depending on the parameters
-                 * @param pageIndex  the page index for the pagination
-                 * @param pageSize  number of items required per page
-                 * @param missing  if true filter missing keys (return missing keys, not the other unless another filter is specified)
-                 * @param outdated if true filter outdated keys (return outdated keys, not the other unless another filter is specified)
-                 * @param searchName text string to filter keys on
-                 * @param approx if true filter approximate keys (return approximate keys, not the other unless another filter is specified)
-                 */
-                $scope.updateKeysList = function (pageIndex, pageSize, missing, outdated, searchName, approx) {
-                    SeedI18nService.keys.query({
-                            pageIndex: pageIndex,
-                            pageSize: pageSize,
-                            isMissing: missing,
-                            isOutdated: outdated,
-                            searchName: searchName,
-                            isApprox: approx
-                        },
-                        function (data) {
-                            if (data.length) {
-                                $scope.keys = data;
-
-                                // the if is for the pagination, if we are not on the
-                                // last element we set the the first key of the page to be selected
-                                if (!$scope.lastOfList) {
-                                    $scope.setCurrentKey($scope.keys[0]);
-                                }
-                                // else we set the last element as selected
-                                else {
-                                    $scope.setCurrentKey($scope.keys[$scope.keys.$viewInfo.pageSize - 1]);
-                                    $scope.lastOfList = false;
-                                }
-
-                                $scope.numPages = function () {
-                                    // note .$viewInfo metadata holder property is added to the prototype by an $http interceptor outside of this module
-                                    return Math.ceil(data.$viewInfo.resultSize / $scope.pageSize);
-                                };
-                            } else {
-                                $scope.keys = [];
-                            }
-
-                        });
-                };
-
-                /**
-                 * Delete keys depending on the parameters
-                 */
-                $scope.deleteFiltered = function () {
-                    if (!$scope.keys.length) {
-                        window.alert('There is no filtered keys.');
-                        return;
-                    }
-                    if (window.confirm('Are you sure you want to delete all ' +
-                        'the currently filtered keys ? Only the filtered ' +
-                        'keys will be deleted. This action is irreversible.')) {
-                        SeedI18nService.keys.delete({
-                                isMissing: $scope.missing,
-                                isOutdated: $scope.outdated,
-                                searchName: $scope.tempFilterText
-                            },
-                            function (data) {
-                                notificator.notify(data);
-                                $scope.updateKeysList(0, $scope.pageSize, $scope.missing, $scope.outdated, $scope.tempFilterText);
-                            }, function (response) {
-                                notificator.notify(response.status);
-                            });
-                    }
-                };
-
-                // Update the list whenever page and/or filter checkboxes change
-                $scope.$watch('pageIndex + pageSize + outdated + missing', function () {
-                    $scope.hideDelete = true;
-                    $scope.updateKeysList($scope.pageIndex - 1, $scope.pageSize, $scope.missing, $scope.outdated);
-                });
-
-                // get the default locale
-                SeedI18nService.defaultLocale.get(function (defaultLocale) {
-                    if (typeof defaultLocale.englishLanguage === 'undefined') {
-                        $scope.disableKeyInput = true;
-                    }
-                    $scope.defaultLocale = defaultLocale;
-                    //get the application locales
-                    SeedI18nService.applicationLocales.query(function (data) {
-                        $scope.applicationLocales = data;
-                        $scope.target = $scope.applicationLocales[1];
-                        $scope.allowTranslate = function () {
-                            return typeof $scope.defaultLocale.englishLanguage !== 'undefined' && $scope.applicationLocales.length > 1;
-                        };
-                    });
-                });
-
-                $scope.setTarget = function (target) {
-                    $scope.target = target;
-                };
-
-                $scope.translate = function () {
-                    Target.setTarget($scope.target);
-                    if ($scope.target) {
-                        if ($scope.defaultLocale.englishLanguage !== $scope.target.englishLanguage) {
-                            $location.path('w20-i18n-addon/translate');
+                        // the if is for the pagination, if we are not on the
+                        // last element we set the the first key of the page to be selected
+                        if (!$scope.lastOfList) {
+                            $scope.setCurrentKey($scope.keys[0]);
                         }
+                        // else we set the last element as selected
                         else {
-                            notificator.notify('default locale is already ' + $scope.defaultLocale.englishLanguage);
+                            $scope.setCurrentKey($scope.keys[$scope.keys.$viewInfo.pageSize - 1]);
+                            $scope.lastOfList = false;
                         }
+
+                        $scope.numPages = function () {
+                            // note .$viewInfo metadata holder property is added to the prototype by an $http interceptor outside of this module
+                            return Math.ceil(data.$viewInfo.resultSize / $scope.pageSize);
+                        };
+                    } else {
+                        $scope.keys = [];
                     }
-                };
 
+                });
+        };
 
-                /**
-                 * Set the current key and watch its properties in order to dynamically set the "state" (outdated, approximate, missing)
-                 * @param key the key to set as current
-                 */
-                $scope.setCurrentKey = function (key) {
-                    // set when a key was deleted to hide the right panel where the key was. It goes back to false again
-                    // when setting a new current key
-                    $scope.hideDelete = false;
-                    var backendValue;
-                    SeedI18nService.keys.get({name: key.name}, function (data) {
-                        backendValue = data;
-                        key.comment = backendValue.comment;
-                        key.translation = backendValue.translation;
-                        $scope.currentKey[0] = key;
-                        // Used to set the square "outdated" and "missing" by watching the state of the currentKey
-                        $scope.$watch('currentKey[0]', function (newVal, oldVal) {
-                            if (newVal.name === oldVal.name) {
-                                if (newVal.translation !== oldVal.translation) {
-                                    $scope.currentKey[0].outdated = true;
-                                }
-                                if ($scope.currentKey[0].translation === backendValue.translation && !backendValue.outdated) {
-                                    $scope.currentKey[0].outdated = false;
-                                }
-                                $scope.currentKey[0].missing = !newVal.translation;
-                            }
-                        }, true);
-                    });
-                };
-
-                // search filter with .5s throttle before it fetches result from the backend
-                $scope.tempFilterText = '';
-                var filterTextTimeout;
-                $scope.$watch('keyFilterSearch.name', function (val) {
-                    if (filterTextTimeout) {
-                        $timeout.cancel(filterTextTimeout);
-                    }
-                    $scope.tempFilterText = val;
-                    filterTextTimeout = $timeout(function () {
+        $scope.deleteFiltered = function () {
+            if (!$scope.keys.length) {
+                window.alert('There is no filtered keys.');
+                return;
+            }
+            if (window.confirm('Are you sure you want to delete all the currently filtered keys ? Only the filtered keys will be deleted. This action is irreversible.')) {
+                SeedI18nService.keys.delete({
+                        isMissing: $scope.missing,
+                        isOutdated: $scope.outdated,
+                        searchName: $scope.tempFilterText
+                    },
+                    function (data) {
                         $scope.updateKeysList(0, $scope.pageSize, $scope.missing, $scope.outdated, $scope.tempFilterText);
-                    }, 500);
-                });
-
-                $scope.clear = function () {
-                    if (window.confirm('Clear form ?')) {
-                        $scope.currentKey[0].comment = '';
-                        $scope.currentKey[0].translation = '';
-                    }
-
-                };
-
-                $scope.navigate = function (direction) {
-                    for (var i = 0, len = $scope.keys.length; i < len; i++) {
-                        if ($scope.keys[i].name === $scope.currentKey[0].name) {
-                            if (direction === 'backward') {
-                                if (i !== 0) {
-                                    $scope.setCurrentKey($scope.keys[i - 1]);
-                                }
-                                else if ($scope.pageIndex > 1) {
-                                    $scope.lastOfList = true;
-                                    $scope.pageIndex--;
-                                }
-                                break;
-                            }
-                            if (direction === 'forward') {
-                                if (i !== $scope.keys.length - 1) {
-                                    $scope.setCurrentKey($scope.keys[i + 1]);
-                                }
-                                else if ($scope.pageIndex !== $scope.keys.$viewInfo.pagesCount) {
-                                    $scope.lastOfList = false;
-                                    $scope.pageIndex++;
-                                }
-                                break;
-                            }
-
-
-                        }
-                    }
-                };
-
-                /**
-                 * Update the key
-                 * @param key the key to update
-                 */
-                $scope.updateKeys = function (key) {
-                    SeedI18nService.keys.update({name: key.name}, key, function () {
-                            notificator.notify('key saved');
-                        },
-                        function () {
-                            notificator.notify('key failed to save');
-                        });
-                };
-
-                $scope.newKey = {name: ''};
-
-                // Watch the model on input field of new key to prevent space input in key title
-                $scope.$watch('newKey.name', function () {
-                    if ($scope.newKey.name) {
-                        $scope.newKey.name = $scope.newKey.name.toLowerCase().replace(/\s+/g, '');
-                    }
-                });
-
-                /**
-                 * Save a new key
-                 * @param key the new key to save
-                 * @param createAnother flag to create another key
-                 */
-                $scope.submitKey = function (key, createAnother) {
-                    // add defaultLocale to new key :
-                    key.defaultLocale = $scope.defaultLocale.code;
-                    var newkey = new SeedI18nService.keys(key);
-                    SeedI18nService.keys.save(newkey, function (data) {
-                        $scope.keys.push(data);
-                        notificator.notify('new key saved');
-                        $scope.newKey.name = '';
-                        $scope.newKey.comment = '';
-                        $scope.newKey.translation = '';
-                        // close panel if not "save and new"
-                        if (!createAnother) {
-                            $timeout(function () {
-                                $scope.addKey = !$scope.addKey;
-                            }, 1000);
-                        }
                     }, function (response) {
-                        if (response.status === 400) {
-                            notificator.notify(response.data);
-                        }
-                        if (response.status === 409) {
-                            notificator.notify('Failed to save : key name already exist.');
-                        }
+
                     });
-                };
+            }
+        };
 
-                $scope.resetNewKey = function () {
-                    if (window.confirm('Clear form ?')) {
-                        $scope.newKey.name = '';
-                        $scope.newKey.comment = '';
-                        $scope.newKey.translation = '';
+        // Update the list whenever page and/or filter checkboxes change
+        $scope.$watch('pageIndex + pageSize + outdated + missing', function () {
+            $scope.hideDelete = true;
+            $scope.updateKeysList($scope.pageIndex - 1, $scope.pageSize, $scope.missing, $scope.outdated);
+        });
+
+        // get the default locale
+        SeedI18nService.defaultLocale.get(function (defaultLocale) {
+            if (typeof defaultLocale.englishLanguage === 'undefined') {
+                $scope.disableKeyInput = true;
+            }
+            $scope.defaultLocale = defaultLocale;
+            //get the application locales
+            SeedI18nService.applicationLocales.query(function (data) {
+                $scope.applicationLocales = data;
+                $scope.target = $scope.applicationLocales[1];
+                $scope.allowTranslate = function () {
+                    return typeof $scope.defaultLocale.englishLanguage !== 'undefined' && $scope.applicationLocales.length > 1;
+                };
+            });
+        });
+
+
+        $scope.translate = function () {
+            if ($scope.defaultLocale.englishLanguage !== $scope.target.englishLanguage) {
+
+            }
+            else {
+
+            }
+        };
+
+
+        /**
+         * Set the current key and watch its properties in order to dynamically set the "state" (outdated, approximate, missing)
+         * @param key the key to set as current
+         */
+        $scope.setCurrentKey = function (key) {
+            // set when a key was deleted to hide the right panel where the key was. It goes back to false again
+            // when setting a new current key
+            $scope.hideDelete = false;
+            var backendValue;
+            SeedI18nService.keys.get({name: key.name}, function (data) {
+                backendValue = data;
+                key.comment = backendValue.comment;
+                key.translation = backendValue.translation;
+                $scope.currentKey[0] = key;
+                // Used to set the square "outdated" and "missing" by watching the state of the currentKey
+                $scope.$watch('currentKey[0]', function (newVal, oldVal) {
+                    if (newVal.name === oldVal.name) {
+                        if (newVal.translation !== oldVal.translation) {
+                            $scope.currentKey[0].outdated = true;
+                        }
+                        if ($scope.currentKey[0].translation === backendValue.translation && !backendValue.outdated) {
+                            $scope.currentKey[0].outdated = false;
+                        }
+                        $scope.currentKey[0].missing = !newVal.translation;
                     }
-                };
+                }, true);
+            });
+        };
 
-                $scope.deleteKey = function (key) {
-                    if (window.confirm('Delete Key ?')) {
-                        SeedI18nService.keys.delete({name: key.name}, key, function (data) {
-                            $scope.keys.splice(_.indexOf($scope.keys, _.find($scope.keys, function (k) {
-                                return k.name === data.name;
-                            })), 1);
-                        });
+        // search filter with .5s throttle before it fetches result from the backend
+        $scope.tempFilterText = '';
+        var filterTextTimeout;
+        $scope.$watch('keyFilterSearch.name', function (val) {
+            if (filterTextTimeout) {
+                $timeout.cancel(filterTextTimeout);
+            }
+            $scope.tempFilterText = val;
+            filterTextTimeout = $timeout(function () {
+                $scope.updateKeysList(0, $scope.pageSize, $scope.missing, $scope.outdated, $scope.tempFilterText);
+            }, 500);
+        });
 
-                        $scope.hideDelete = true;
+        $scope.clear = function () {
+            if (window.confirm('Clear form ?')) {
+                $scope.currentKey[0].comment = '';
+                $scope.currentKey[0].translation = '';
+            }
+
+        };
+
+        $scope.navigate = function (direction) {
+            for (var i = 0, len = $scope.keys.length; i < len; i++) {
+                if ($scope.keys[i].name === $scope.currentKey[0].name) {
+                    if (direction === 'backward') {
+                        if (i !== 0) {
+                            $scope.setCurrentKey($scope.keys[i - 1]);
+                        }
+                        else if ($scope.pageIndex > 1) {
+                            $scope.lastOfList = true;
+                            $scope.pageIndex--;
+                        }
+                        break;
                     }
-                };
+                    if (direction === 'forward') {
+                        if (i !== $scope.keys.length - 1) {
+                            $scope.setCurrentKey($scope.keys[i + 1]);
+                        }
+                        else if ($scope.pageIndex !== $scope.keys.$viewInfo.pagesCount) {
+                            $scope.lastOfList = false;
+                            $scope.pageIndex++;
+                        }
+                        break;
+                    }
 
-                $scope.exportPath = $scope.restPrefix + '/keys/file';
+
+                }
+            }
+        };
+
+        /**
+         * Update the key
+         * @param key the key to update
+         */
+        $scope.updateKeys = function (key) {
+            SeedI18nService.keys.update({name: key.name}, key, function () {
+                    notificator.notify('key saved');
+                },
+                function () {
+                    notificator.notify('key failed to save');
+                });
+        };
+
+        $scope.newKey = {name: ''};
+
+        // Watch the model on input field of new key to prevent space input in key title
+        $scope.$watch('newKey.name', function () {
+            if ($scope.newKey.name) {
+                $scope.newKey.name = $scope.newKey.name.toLowerCase().replace(/\s+/g, '');
+            }
+        });
+
+        /**
+         * Save a new key
+         * @param key the new key to save
+         * @param createAnother flag to create another key
+         */
+        $scope.submitKey = function (key, createAnother) {
+            // add defaultLocale to new key :
+            key.defaultLocale = $scope.defaultLocale.code;
+            var newkey = new SeedI18nService.keys(key);
+            SeedI18nService.keys.save(newkey, function (data) {
+                $scope.keys.push(data);
+                notificator.notify('new key saved');
+                $scope.newKey.name = '';
+                $scope.newKey.comment = '';
+                $scope.newKey.translation = '';
+                // close panel if not "save and new"
+                if (!createAnother) {
+                    $timeout(function () {
+                        $scope.addKey = !$scope.addKey;
+                    }, 1000);
+                }
+            }, function (response) {
+                if (response.status === 400) {
+                    notificator.notify(response.data);
+                }
+                if (response.status === 409) {
+                    notificator.notify('Failed to save : key name already exist.');
+                }
+            });
+        };
+
+        $scope.resetNewKey = function () {
+            if (window.confirm('Clear form ?')) {
+                $scope.newKey.name = '';
+                $scope.newKey.comment = '';
+                $scope.newKey.translation = '';
+            }
+        };
+
+        $scope.deleteKey = function (key) {
+            if (window.confirm('Delete Key ?')) {
+                SeedI18nService.keys.delete({name: key.name}, key, function (data) {
+                    $scope.keys.splice(_.indexOf($scope.keys, _.find($scope.keys, function (k) {
+                        return k.name === data.name;
+                    })), 1);
+                });
+
+                $scope.hideDelete = true;
+            }
+        };
+
+        $scope.exportPath = $scope.restPrefix + '/keys/file';
 
 
-            }]);
+    }]);
+
 
     /**
      * Translations controller
@@ -971,13 +950,16 @@ define([
             });
 
         };
+
+
     });
 
 
-    // Expose the angular module to W20 loader
+// Expose the angular module to W20 loader
     return {
         angularModules: ['i18nTranslator']
     };
+
 });
 
 
