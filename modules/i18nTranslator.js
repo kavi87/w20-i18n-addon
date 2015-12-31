@@ -380,7 +380,24 @@ define([
 
         $scope.withoutDefault = function (locale) {
             return locale.code !== $scope.app.defaultLocale.code;
-        }
+        };
+    }]);
+
+    module.directive('w20Focus', ['$timeout', function ($timeout) {
+        return {
+            scope: {
+                trigger: '=w20Focus'
+            },
+            link: function(scope, element) {
+                scope.$watch('trigger', function(value) {
+                    if(value === true) {
+                        $timeout(function(){
+                            element[0].focus();
+                        }, 0);
+                    }
+                });
+            }
+        };
     }]);
 
     module.directive('w20DropdownBlur', ['$timeout', function ($timeout) {
