@@ -164,13 +164,10 @@
     </div>
     <div id="new-key" data-ng-show="addingNewKey" class="row">
         <div class="col-md-8">
-            <h4>
-                {{  "application.view.seed-i18n.addkeytitle" | localize }}
-            </h4>
-            <button class="btn btn-default btn-sm pull-right" data-ng-click="addingNewKey = false">
+            <button class="btn btn-default btn-sm" data-ng-click="addingNewKey = false">
                 <i class="fa fa-times"></i> {{ "application.view.seed-i18n.cancel" | localize }}
             </button>
-            <br><br>
+            <h4>{{  "application.view.seed-i18n.addkeytitle" | localize }}</h4>
             <div  class="panel panel-default">
                 <div class="panel-heading">
                     <div class="form-inline">
@@ -210,14 +207,16 @@
                         <label>{{ 'application.view.seed-i18n.comment' | localize }}</label>
                         <textarea class="form-control" rows="3"></textarea>
                     </div>
+
+                    <div class="form-inline">
+                        <div class="form-group pull-right">
+                            <button class="btn btn-default btn-sm"><i class="fa fa-plus-square-o"></i> {{  "application.view.seed-i18n.saveandnew" | localize }}</button>
+                            <button class="btn btn-success btn-sm"><i class="fa fa-plus"></i> {{ "application.view.seed-i18n.save" | localize }}</button>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="form-inline">
-                <div class="form-group pull-right">
-                    <button class="btn btn-default btn-sm"><i class="fa fa-plus-square-o"></i> {{  "application.view.seed-i18n.saveandnew" | localize }}</button>
-                    <button class="btn btn-success btn-sm"><i class="fa fa-plus"></i> {{ "application.view.seed-i18n.save" | localize }}</button>
-                </div>
-            </div>
+
         </div>
     </div>
 </script>
