@@ -13,13 +13,14 @@ define([
     '{lodash}/lodash',
     '{dropzone}/dropzone-amd-module',
     '[text]!{w20-i18n-addon}/templates/confirm.html',
+    '[text]!{w20-i18n-addon}/templates/pager.html',
 
     '{w20-core}/modules/notifications',
     '{angular-sanitize}/angular-sanitize',
     '{angular-resource}/angular-resource',
     '{w20-core}/modules/security',
     '{w20-dataviz}/modules/charts/multibar'
-], function (_module, require, $, angular, _, Dropzone, confirmTemplate) {
+], function (_module, require, $, angular, _, Dropzone, confirmTemplate, pagerTemplate) {
     'use strict';
 
     var _config = _module && _module.config() || {};
@@ -260,23 +261,6 @@ define([
     }]);
 
     module.controller('SeedI18nDashboardController', ['$scope', 'SeedI18nService', '$q', function ($scope, rest, $q) {
-        function difference(one, two) {
-            var result = [];
-            var arrayObjectIndexOf = function (myArray, searchTerm, property) {
-                for (var i = 0, len = myArray.length; i < len; i++) {
-                    if (myArray[i][property] === searchTerm) {
-                        return i;
-                    }
-                }
-                return -1;
-            };
-            for (var i = 0, len1 = one.length; i < len1; i++) {
-                if (arrayObjectIndexOf(two, one[i].englishLanguage, 'englishLanguage') === -1) {
-                    result.push(one[i]);
-                }
-            }
-            return result;
-        }
 
         function errorHandler(error) {
             throw new Error(error.message);
@@ -287,14 +271,14 @@ define([
         $scope.locales.add = function (locale) {
             if (locale) {
                 $scope.app.applicationLocales.push(locale);
-                this.allLocales = difference(this.allLocales, $scope.app.applicationLocales);
+                this.allLocales = _.xor(this.allLocales, $scope.app.applicationLocales);
                 rest.applicationLocales.update($scope.app.applicationLocales, angular.noop, errorHandler);
             }
         };
 
         $scope.locales.remove = function (locale) {
             if (locale) {
-                $scope.app.applicationLocales = difference($scope.app.applicationLocales, [locale]);
+                $scope.app.applicationLocales = _.xor($scope.app.applicationLocales, [locale]);
                 this.allLocales = this.allLocales.concat([locale]);
                 if ($scope.app.defaultLocale && $scope.app.defaultLocale.englishLanguage === locale.englishLanguage) {
                     $scope.app.defaultLocale = undefined;
@@ -325,7 +309,7 @@ define([
                 $scope.app.applicationLocales = result.applicationLocales;
             }
             if (result.allLocales && result.allLocales.length) {
-                $scope.locales.allLocales = difference(result.allLocales, $scope.app.applicationLocales);
+                $scope.locales.allLocales = _.xor(result.allLocales, $scope.app.applicationLocales);
             }
             if (result.defaultLocale) {
                 for (var i = 0; i < $scope.app.applicationLocales.length; i++) {
@@ -338,11 +322,41 @@ define([
         }, errorHandler);
     }]);
 
-    module.controller('SeedI18nKeysController', ['$scope', 'SeedI18nService', function ($scope, rest) {
+    module.controller('SeedI18nKeysController', ['$scope', 'SeedI18nService', '$timeout', function ($scope, rest, $timeout) {
+
         function getKeys(options, callback) {
-            rest.keys.query(options, function (keys) {
-                callback(keys);
-            }, errorHandler);
+            rest.keys.query(options, callback, errorHandler);
+        }
+
+        function createKey(key, callback) {
+            $scope.keys.errors = {};
+            var newKey = new rest.keys(key);
+            newKey.$save(callback, function (error) {
+                if (error.status === 409) {
+                    $scope.keys.errors.alreadyExists = true;
+                } else {
+                    errorHandler(error);
+                }
+            });
+        }
+
+        function deleteKey(key, callback) {
+            rest.keys.delete({name: key.name}, callback, errorHandler);
+        }
+
+        function saveSuccessFeedback() {
+            $scope.keys.saveSuccessFeedback = true;
+            $scope.keys.addKeyForm.$setUntouched();
+            $timeout(function () {
+                $scope.keys.saveSuccessFeedback = false;
+            }, 500);
+        }
+
+        function addAnotherKey() {
+            $timeout(function () {
+                $scope.keys.addingNew = true;
+                $scope.keys.addKeyForm.$setUntouched();
+            }, 500);
         }
 
         function errorHandler(error) {
@@ -350,36 +364,79 @@ define([
         }
 
         $scope.keys = {};
-
-        $scope.keys.emptyList = false;
-
-        $scope.keys.setSourceLocale = function (locale) {
-            $scope.app.sourceLocale = locale;
-        };
-
-        $scope.keys.delete = function (key) {
-            _.pull($scope.keys.list, key);
-            rest.keys.delete({ name: key.name }, angular.noop, errorHandler);
-        };
+        $scope.keys.errors = {};
+        $scope.keys.isEmpty = false;
+        $scope.keys.addingNew = false;
 
         $scope.keys.criterias = {
+            pageIndex: 1,
+            pageSize: 40,
             isMissing: false,
             isOutdated: false,
             isApprox: false,
             searchName: ''
         };
 
-        getKeys($scope.keys.criterias, function (keys) {
-            if (keys && keys.length > 0) {
-                $scope.keys.list = keys;
-                $scope.keys.emptyList = false;
-            } else {
-                $scope.keys.emptyList = true;
-            }
-        });
+        $scope.keys.setSourceLocale = function (locale) {
+            $scope.app.sourceLocale = locale;
+        };
+
+        $scope.keys.get = function () {
+            getKeys($scope.keys.criterias, function (keys) {
+                $scope.keys.isEmpty = !(keys && keys.length > 0);
+                $scope.keys.list = $scope.keys.isEmpty ? [] : keys;
+                // todo change to $viewInfo and Math.ceil(scope.keys.totalSize / scope.keys.criterias.pageSize)
+                $scope.keys.numberOfPages = 3;
+            });
+        };
+
+        $scope.keys.add = function (key, another) {
+            createKey(key, function (savedKey) {
+                $scope.keys.list.push(savedKey);
+                $scope.keys.new = {};
+                $scope.keys.addKeyForm.$setPristine();
+                $scope.keys.addKeyForm.$setUntouched();
+                $scope.keys.addingNew = false;
+                saveSuccessFeedback();
+                if (another) {
+                    addAnotherKey();
+                }
+            });
+        };
+
+        $scope.keys.delete = function (key) {
+            deleteKey(key, function (deletedKey) {
+                _.pull($scope.keys.list, deletedKey);
+            });
+        };
 
         $scope.withoutDefault = function (locale) {
             return locale.code !== $scope.app.defaultLocale.code;
+        };
+
+        $scope.keys.get();
+
+    }]);
+
+    module.controller('SeedI18nImportExportController', ['$scope', function ($scope) {
+        $scope.exportPath = $scope.app.restPrefix + '/keys/file';
+    }]);
+
+    module.directive('w20Pager', [function () {
+        return {
+            restrict: 'A',
+            template: pagerTemplate,
+            link: function (scope) {
+                scope.previous = function () {
+                    scope.keys.criterias.pageIndex -= 1;
+                    scope.keys.get();
+
+                };
+                scope.next = function () {
+                    scope.keys.criterias.pageIndex += 1;
+                    scope.keys.get();
+                };
+            }
         };
     }]);
 
@@ -388,10 +445,10 @@ define([
             scope: {
                 trigger: '=w20Focus'
             },
-            link: function(scope, element) {
-                scope.$watch('trigger', function(value) {
-                    if(value === true) {
-                        $timeout(function(){
+            link: function (scope, element) {
+                scope.$watch('trigger', function (value) {
+                    if (value === true) {
+                        $timeout(function () {
                             element[0].focus();
                         }, 0);
                     }
@@ -403,8 +460,8 @@ define([
     module.directive('w20DropdownBlur', ['$timeout', function ($timeout) {
         return {
             link: function (scope, element) {
-                element.find('a').on('click', function(event) {
-                    angular.element( event.target ).blur();
+                element.find('a').on('click', function (event) {
+                    angular.element(event.target).blur();
                     return false;
                 });
             }
@@ -415,7 +472,7 @@ define([
         return {
             template: confirmTemplate,
             scope: {
-              w20Confirm: '&'
+                w20Confirm: '&'
             },
             link: function (scope) {
                 scope.isDeleting = false;
@@ -971,8 +1028,6 @@ define([
 
     });
 
-
-// Expose the angular module to W20 loader
     return {
         angularModules: ['i18nTranslator']
     };

@@ -3,6 +3,7 @@
   "application.view.seed-i18n.settings": "Paramètres",
   "application.view.seed-i18n.confirm": "Confirmer",
   "application.view.seed-i18n.abort": "Abandon",
+  "application.view.seed-i18n.required": "Ce champ est requis",
 
   "application.view.seed-i18n.key-name": "Nom de la clé",
   "application.view.seed-i18n.addkeytitle": "Ajouter une clé",
@@ -14,6 +15,7 @@
   "application.view.seed-i18n.languages-to-add": "Sélectionner les langues à ajouter",
   "application.view.seed-i18n.twolocalesminimum": "Deux langues au minimum requise !",
   "application.view.seed-i18n.importkeys": "Importer les clés",
+  "application.view.seed-i18n.import-export": "Import / Export",
   "application.view.seed-i18n.add-new-key": "Ajouter une clé",
   "application.view.seed-i18n.statisticresult": "Resultat de Statistique",
   "application.view.seed-i18n.save": "Enregistrer",

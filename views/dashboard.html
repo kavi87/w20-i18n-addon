@@ -15,6 +15,9 @@
                     <div data-tab data-heading="{{ 'application.view.seed-i18n.translate' | localize }}">
 
                     </div>
+                    <div data-tab data-heading="{{ 'application.view.seed-i18n.import-export' | localize }}">
+                        <div id="import-export" data-ng-include data-src="'/importExportTemplate.html'"></div>
+                    </div>
                     <div data-tab data-heading="{{ 'application.view.seed-i18n.statistic' | localize }}">
 
                     </div>
@@ -46,11 +49,8 @@
                 <ul class="list-group">
                     <li data-ng-repeat="availableLocale in app.applicationLocales | orderBy:'availableLocale.englishLanguage'"
                         class="list-group-item">
-                        {{ availableLocale.englishLanguage }} ({{ availableLocale.code }})
-                        <button title="Remove" class="pull-right btn btn-xs btn-default"
-                                data-ng-click="locales.remove(availableLocale)">
-                            <i class="fa fa-times"></i>
-                        </button>
+                        <i class="fa fa-flag"></i> {{ availableLocale.englishLanguage }} <small>{{ availableLocale.code }}</small>
+                        <div data-w20-confirm="locales.remove(availableLocale)" class="pull-right"></div>
                     </li>
                 </ul>
                 <button class="btn btn-default" data-ng-show="!addNewLanguage"
@@ -61,39 +61,45 @@
         </div>
         <div id="new-language" class="form-group col-sm-9" data-ng-show="addNewLanguage">
             <label>{{ "application.view.seed-i18n.languages-to-add" | localize }}</label>
-            <input class="form-control" type="search" data-ng-model="searchLocales"
-                   placeholder="{{ 'application.view.seed-i18n.search' | localize }}"
-                   data-results="0">
-            <br>
+            <div class="form-group input-group col-md-6">
+                <span class="input-group-addon"><i class="fa fa-search"></i></span>
+                <input type="search"
+                       data-ng-model="searchLocales"
+                       placeholder="{{ 'application.view.seed-i18n.search' | localize }}"
+                       data-results="0"
+                       class="form-control">
+            </div>
             <ul class="list-group" style="height: 500px; overflow-y: scroll">
                 <li data-ng-repeat="locale in locales.allLocales | filter:searchLocales | orderBy:'locale.englishLanguage'"
                     data-ng-click="locales.add(locale)"
                     class="list-group-item"
                     style="cursor: pointer">
-                    <span>
-                        <i class="fa fa-plus"></i>
-                    </span>
-                    {{ locale.englishLanguage }} ({{ locale.code }})
+                    <i class="fa fa-flag"></i> {{ locale.englishLanguage }}
+                    <span class="pull-right"><strong>{{ locale.code }}</strong></span>
                 </li>
             </ul>
         </div>
     </div>
 </script>
-
 <script type="text/ng-template" id="/keyManagementTemplate.html">
     <br>
-    <div class="row" data-ng-hide="addingNewKey">
+    <div data-ng-show="keys.errors.alreadyExists" class="col-md-8 alert alert-danger alert-dismissible">
+        <button data-ng-click="keys.errors.alreadyExists = false" type="button" class="close" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <i class="fa fa-warning"></i> <strong>Failed to save</strong> : key name already exists.
+    </div>
+    <div class="row" data-ng-hide="keys.addingNew">
         <div class="col-md-8">
-            <div class="col-sm-6" style="padding-left: 0;">
+            <div class="col-sm-5" style="padding-left: 0;">
                 <div id="search-area" class="form-group input-group">
                     <span class="input-group-addon"><i class="fa fa-search"></i></span>
                     <input type="search"
+                           data-ng-model="keys.criterias.searchName"
                            placeholder="{{ 'application.view.seed-i18n.searchkeys' | localize }}"
                            data-results="0"
                            class="form-control">
                 </div>
             </div>
-            <div id="options-area" class="col-sm-6" style="padding-left: 0; padding-right: 0;">
+            <div class="col-sm-7" id="options-area" style="padding-left: 0; padding-right: 0;">
                 <div class="btn-group">
                     <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                         {{ app.sourceLocale.englishLanguage }} <span class="caret"></span>
@@ -104,11 +110,12 @@
                         </li>
                     </ul>
                 </div>
-                <button data-ng-init="addingNewKey = false" data-ng-click="addingNewKey = !addingNewKey" class="btn btn-default">
+                <button data-ng-click="keys.addingNew = !keys.addingNew" class="btn btn-primary">
                     <i class="fa fa-plus"></i> {{ "application.view.seed-i18n.add-new-key" | localize }}
                 </button>
+                <nav class="pull-right" data-w20-pager></nav>
                 <div class="btn-group pull-right" data-ng-init="showTranslations = true; showComments = true">
-                    <a class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <a class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                         <i class="fa fa-cog"></i>
                     </a>
                     <ul class="dropdown-menu">
@@ -128,9 +135,81 @@
             <br>
         </div>
     </div>
-    <div id="keys-list" data-ng-hide="addingNewKey" class="row">
+    <div id="new-key" data-ng-show="keys.addingNew" class="row">
         <div class="col-md-8">
-            <div id="keys-not-found-message" class="alert alert-warning" data-ng-show="keys.emptyList">
+            <div class="clearfix"></div>
+            <div class="pull-right">
+                <div class="btn-group">
+                    <div class="button-group">
+                        <button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown">
+                            <i class="fa fa-plus"></i> Add translations <span class="caret"></span>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li data-ng-repeat="locale in app.applicationLocales | filter:withoutDefault" data-w20-dropdown-blur>
+                                <a data-ng-click="locale._selected = !locale._selected" href="" class="small" tabIndex="-1">
+                                    <i data-ng-show="locale._selected" class="fa fa-check"></i> {{ locale.englishLanguage }}
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <button class="btn btn-danger btn-sm" data-ng-click="keys.addingNew = false">
+                    <i class="fa fa-times"></i> {{  "application.view.seed-i18n.cancel" | localize }}
+                </button>
+            </div>
+            <h4>{{  "application.view.seed-i18n.addkeytitle" | localize }}</h4>
+            <form novalidate name="keys.addKeyForm">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group has-feedback" data-ng-class="{'has-success': keys.addKeyForm.name.$touched && !keys.addKeyForm.name.$error.required, 'has-error': keys.addKeyForm.name.$touched && keys.addKeyForm.name.$error.required}">
+                                    <label>{{ 'application.view.seed-i18n.key-name' |localize }}</label>
+                                    <input name="name" required data-ng-model="keys.new.name" data-w20-focus="keys.addingNew" type="text" class="form-control">
+                                    <span class="glyphicon glyphicon-remove form-control-feedback" aria-hidden="true" data-ng-show="keys.addKeyForm.name.$touched && keys.addKeyForm.name.$error.required"></span>
+                                    <span class="glyphicon glyphicon-ok form-control-feedback" aria-hidden="true" data-ng-show="keys.addKeyForm.name.$touched && !keys.addKeyForm.name.$error.required"></span>
+                                    <small class="text-danger" data-ng-show="keys.addKeyForm.name.$touched && keys.addKeyForm.name.$error.required"><i class="fa fa-warning"></i> {{ 'application.view.seed-i18n.required' | localize }}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="form-group has-feedback" data-ng-class="{'has-success': keys.addKeyForm.defaultTranslation.$touched && !keys.addKeyForm.defaultTranslation.$error.required, 'has-error': keys.addKeyForm.defaultTranslation.$touched && keys.addKeyForm.defaultTranslation.$error.required}">
+                            <label>{{ 'application.view.seed-i18n.default-translation' | localize }} ({{ app.defaultLocale.englishLanguage }})</label>
+                            <textarea required name="defaultTranslation" data-ng-model="keys.new.translation" class="form-control" rows="3"></textarea>
+                            <span class="glyphicon glyphicon-remove form-control-feedback" aria-hidden="true" data-ng-show="keys.addKeyForm.defaultTranslation.$touched && keys.addKeyForm.defaultTranslation.$error.required"></span>
+                            <span class="glyphicon glyphicon-ok form-control-feedback" aria-hidden="true" data-ng-show="keys.addKeyForm.defaultTranslation.$touched && !keys.addKeyForm.defaultTranslation.$error.required"></span>
+                            <small class="text-danger" data-ng-show="keys.addKeyForm.defaultTranslation.$touched && keys.addKeyForm.defaultTranslation.$error.required"><i class="fa fa-warning"></i> {{ 'application.view.seed-i18n.required' | localize }}</small>
+                        </div>
+                        <div class="form-group">
+                            <div data-ng-repeat="locale in app.applicationLocales | filter:{_selected: true}" class="form-group">
+                                <label>{{ locale.englishLanguage }}</label>
+                                <textarea class="form-control" rows="3"></textarea>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>{{ 'application.view.seed-i18n.comment' | localize }}</label>
+                            <textarea data-ng-model="keys.new.comment" class="form-control" rows="3"></textarea>
+                        </div>
+                        <div class="form-inline">
+                            <div class="form-group pull-right">
+                                <button type="submit" data-ng-disabled="keys.addKeyForm.$invalid" data-ng-click="keys.add(newKey, true)" class="btn btn-default btn-sm"><i class="fa fa-check-square-o"></i> {{  "application.view.seed-i18n.saveandnew" | localize }}</button>
+                                <button type="submit" data-ng-disabled="keys.addKeyForm.$invalid" data-ng-click="keys.add(newKey)" class="btn btn-success btn-sm"><i class="fa fa-check"></i> {{ "application.view.seed-i18n.save" | localize }}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-8">
+            <div data-ng-show="keys.saveSuccessFeedback" class="alert alert-success"> Key application.view.seed-i18n.key-name saved successfully </div>
+        </div>
+    </div>
+    <div id="keys-list" class="row">
+        <div class="col-md-8">
+            <div id="keys-not-found-message" class="alert alert-warning" data-ng-show="keys.isEmpty">
                 <i class="fa fa-warning"></i> {{ "application.view.seed-i18n.no-keys-retrieved" | localize }}
             </div>
             <div class="panel panel-default" data-ng-repeat="key in keys.list | orderBy: 'key.name'">
@@ -160,63 +239,26 @@
                     </div>
                 </div>
             </div>
+            <nav class="pull-right" data-w20-pager></nav>
         </div>
     </div>
-    <div id="new-key" data-ng-show="addingNewKey" class="row">
-        <div class="col-md-8">
-            <button class="btn btn-default btn-sm" data-ng-click="addingNewKey = false">
-                <i class="fa fa-times"></i> {{ "application.view.seed-i18n.cancel" | localize }}
+</script>
+<script type="text/ng-template" id="/importExportTemplate.html">
+    <br>
+    <div class="row">
+        <div class="col-md-6">
+            <button class="btn btn-primary btn-lg btn-block pull-right" id="submit-all" data-drop-zone>
+                <i class="fa fa-upload"></i> {{ "application.view.seed-i18n.importkeys" | localize }}
             </button>
-            <h4>{{  "application.view.seed-i18n.addkeytitle" | localize }}</h4>
-            <div  class="panel panel-default">
-                <div class="panel-heading">
-                    <div class="form-inline">
-                        <div class="form-group">
-                            <label><i class="fa fa-key"></i></label>
-                            <input data-w20-focus="addingNewKey" type="text" class="form-control" placeholder="{{ 'application.view.seed-i18n.key-name' | localize }}">
-                        </div>
-                    </div>
-                </div>
-                <div class="panel-body">
-                    <div class="btn-group">
-                        <div class="button-group">
-                            <button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown">
-                                <i class="fa fa-plus"></i> Add translations <span class="caret"></span>
-                            </button>
-                            <ul class="dropdown-menu">
-                                <li data-ng-repeat="locale in app.applicationLocales | filter:withoutDefault" data-w20-dropdown-blur>
-                                    <a data-ng-click="locale._selected = !locale._selected" href="" class="small" tabIndex="-1">
-                                        <i data-ng-show="locale._selected" class="fa fa-check"></i> {{ locale.englishLanguage }}
-                                    </a>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                    <br><br>
-                    <div class="form-group">
-                        <label>{{ 'application.view.seed-i18n.default-translation' | localize }} ({{ app.defaultLocale.englishLanguage }})</label>
-                        <textarea class="form-control" rows="3"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <div data-ng-repeat="locale in app.applicationLocales | filter:{_selected: true}" class="form-group">
-                            <label>{{ locale.englishLanguage }}</label>
-                            <textarea class="form-control" rows="3"></textarea>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>{{ 'application.view.seed-i18n.comment' | localize }}</label>
-                        <textarea class="form-control" rows="3"></textarea>
-                    </div>
-
-                    <div class="form-inline">
-                        <div class="form-group pull-right">
-                            <button class="btn btn-default btn-sm"><i class="fa fa-plus-square-o"></i> {{  "application.view.seed-i18n.saveandnew" | localize }}</button>
-                            <button class="btn btn-success btn-sm"><i class="fa fa-plus"></i> {{ "application.view.seed-i18n.save" | localize }}</button>
-                        </div>
-                    </div>
-                </div>
+            <p><br><br><br>{{ "application.view.seed-i18n.dropzone" | localize }}</p>
+            <div>
+                <form class="dropzone" id="file-dropzone" style="margin-bottom:20px"></form>
             </div>
-
+        </div>
+        <div class="col-md-6">
+            <a  class="btn btn-default btn-lg btn-block"
+                data-ng-href="{{ exportPath }}"><i class="fa fa-download"></i> {{ "application.view.seed-i18n.exportkeys" | localize }}
+            </a>
         </div>
     </div>
 </script>

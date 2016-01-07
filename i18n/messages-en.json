@@ -3,6 +3,7 @@
   "application.view.seed-i18n.settings": "Settings",
   "application.view.seed-i18n.confirm": "Confirm",
   "application.view.seed-i18n.abort": "Abort",
+  "application.view.seed-i18n.required": "This field is required",
 
   "application.view.seed-i18n.key-name": "Key name",
   "application.view.seed-i18n.addkeytitle": "Add a new key",
@@ -14,6 +15,7 @@
   "application.view.seed-i18n.languages-to-add": "Select languages to add",
   "application.view.seed-i18n.twolocalesminimum": "Two languages minimum required !",
   "application.view.seed-i18n.importkeys": "Import keys",
+  "application.view.seed-i18n.import-export": "Import / Export",
   "application.view.seed-i18n.add-new-key": "Add new key",
   "application.view.seed-i18n.statisticresult": "Statistic Result",
   "application.view.seed-i18n.save": "Save",
