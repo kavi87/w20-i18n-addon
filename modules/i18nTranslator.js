@@ -263,7 +263,7 @@ define([
     module.controller('SeedI18nDashboardController', ['$scope', 'SeedI18nService', '$q', function ($scope, rest, $q) {
 
         function errorHandler(error) {
-            throw new Error(error.message);
+            throw new Error(error.data);
         }
 
         $scope.locales = {};
@@ -322,16 +322,20 @@ define([
         }, errorHandler);
     }]);
 
-    module.controller('SeedI18nKeysController', ['$scope', 'SeedI18nService', '$timeout', function ($scope, rest, $timeout) {
+    module.controller('SeedI18nKeysController', ['$scope', 'SeedI18nService', '$timeout', '$http', function ($scope, rest, $timeout, $http) {
 
         function getKeys(options, callback) {
-            rest.keys.query(options, callback, errorHandler);
+            $scope.keys.loading = true;
+            rest.keys.query(options, callback, errorHandler).$promise.finally(function () {
+                $scope.keys.loading = false;
+            });
         }
 
         function createKey(key, callback) {
             $scope.keys.errors = {};
+            key.defaultLocale = $scope.app.defaultLocale.code;
             var newKey = new rest.keys(key);
-            newKey.$save(callback, function (error) {
+            rest.keys.save(newKey, callback, function (error) {
                 if (error.status === 409) {
                     $scope.keys.errors.alreadyExists = true;
                 } else {
@@ -369,12 +373,13 @@ define([
         $scope.keys.addingNew = false;
 
         $scope.keys.criterias = {
-            pageIndex: 1,
-            pageSize: 40,
+            pageIndex: 0,
+            // todo allow configuration
+            pageSize: 2,
             isMissing: false,
             isOutdated: false,
             isApprox: false,
-            searchName: ''
+            searchName: undefined
         };
 
         $scope.keys.setSourceLocale = function (locale) {
@@ -385,14 +390,14 @@ define([
             getKeys($scope.keys.criterias, function (keys) {
                 $scope.keys.isEmpty = !(keys && keys.length > 0);
                 $scope.keys.list = $scope.keys.isEmpty ? [] : keys;
-                // todo change to $viewInfo and Math.ceil(scope.keys.totalSize / scope.keys.criterias.pageSize)
-                $scope.keys.numberOfPages = 3;
+                $scope.keys.numberOfPages = Math.ceil(keys.$viewInfo.resultSize / $scope.keys.criterias.pageSize);
             });
         };
 
         $scope.keys.add = function (key, another) {
             createKey(key, function (savedKey) {
                 $scope.keys.list.push(savedKey);
+                $scope.keys.isEmpty = false;
                 $scope.keys.new = {};
                 $scope.keys.addKeyForm.$setPristine();
                 $scope.keys.addKeyForm.$setUntouched();
@@ -411,7 +416,10 @@ define([
         };
 
         $scope.withoutDefault = function (locale) {
-            return locale.code !== $scope.app.defaultLocale.code;
+            if ($scope.app.defaultLocale) {
+                return locale.code !== $scope.app.defaultLocale.code;
+            }
+            return true;
         };
 
         $scope.keys.get();

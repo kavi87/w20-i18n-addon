@@ -1,12 +1,12 @@
 <ul class="pagination" style="display: block; margin-top: 0; margin-bottom: 0; padding-left: 5px">
-    <li data-ng-show="keys.criterias.pageIndex > 1">
-        <button data-ng-click="previous()" class="btn btn-default" aria-label="Previous">
+    <li>
+        <button type="button" data-ng-disabled="keys.criterias.pageIndex + 1 === 1" data-ng-click="previous()" class="btn btn-default" aria-label="Previous">
             <span aria-hidden="true"><i class="fa fa-angle-left"></i></span>
         </button>
     </li>
-    <li style="margin: 0 3px">{{ keys.criterias.pageIndex }}/{{ keys.numberOfPages }}</li>
-    <li data-ng-show="keys.criterias.pageIndex !== keys.numberOfPages">
-        <button data-ng-click="next()" class="btn btn-default" aria-label="Next">
+    <li style="margin: 0 3px">{{ keys.criterias.pageIndex + 1 }}/{{ keys.numberOfPages }}</li>
+    <li>
+        <button type="button" data-ng-disabled="keys.criterias.pageIndex + 1 === keys.numberOfPages" data-ng-click="next()" class="btn btn-default" aria-label="Next">
             <span aria-hidden="true"><i class="fa fa-angle-right"></i></span>
         </button>
     </li>

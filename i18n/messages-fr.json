@@ -4,6 +4,8 @@
   "application.view.seed-i18n.confirm": "Confirmer",
   "application.view.seed-i18n.abort": "Abandon",
   "application.view.seed-i18n.required": "Ce champ est requis",
+  "application.view.seed-i18n.already-exists": "Ce nom existe déjà !",
+  "application.view.seed-i18n.add-translations": "Ajouter des traductions",
 
   "application.view.seed-i18n.key-name": "Nom de la clé",
   "application.view.seed-i18n.addkeytitle": "Ajouter une clé",
